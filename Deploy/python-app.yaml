@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-app-deployment
+  labels:
+    app: python-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: python-app
+  template:
+    metadata:
+      labels:
+        app: python-app
+    spec:
+      containers:
+      - name: python-app-container
+        image: ahmedzenbaa/python-app:1.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+        livenessProbe:
+          httpGet:
+            path: /users
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /users
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 3
+          # add health check
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-app-service
+  labels:
+    app: python-app
+spec:
+  selector:
+    app: python-app
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+
+
