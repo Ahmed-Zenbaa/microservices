@@ -1,0 +1,41 @@
+# add variable of type file: (EKS_CLUSTER_KUBECONFIG) containing the cluster kubeconfig
+
+stages:
+  - build
+  - deploy
+
+
+variables:
+  # vars for image
+  DOCKER_REPO: "ahmedzenbaa"
+  SVC_NAME: "python-app"
+  SVC_VERSION: "1.0.0"
+
+  # Vars for deployment 
+  SVC_DEPLOYMENT_NAME: "python-app-deployment"
+  SVC_CONTAINER_NAME: "python-app-container"
+  SVC_NAMESPACE: "default"
+
+
+
+build_image:
+  stage: build
+  script:
+    - docker build -t ${DOCKER_REPO}/${SVC_NAME}:${SVC_VERSION}-${CI_COMMIT_SHORT_SHA} .
+    - docker push ${DOCKER_REPO}/${SVC_NAME}:${SVC_VERSION}-${CI_COMMIT_SHORT_SHA}
+  only:
+    - main
+
+deploy_image_on_eks:
+  stage: deploy
+  before_script:
+    - chmod 400 $EKS_CLUSTER_KUBECONFIG
+  script:
+    - kubectl --insecure-skip-tls-verify --kubeconfig=$EKS_CLUSTER_KUBECONFIG set image deploy/${SVC_DEPLOYMENT_NAME} ${SVC_CONTAINER_NAME}=${DOCKER_REPO}/${SVC_NAME}:${SVC_VERSION}-${CI_COMMIT_SHORT_SHA} -n ${SVC_NAMESPACE}
+    - sleep 10 
+    - kubectl --insecure-skip-tls-verify --kubeconfig=$EKS_CLUSTER_KUBECONFIG get pods -n ${SVC_NAMESPACE} | grep -i ${SVC_DEPLOYMENT_NAME} | awk '{print $1}'
+    - kubectl --insecure-skip-tls-verify --kubeconfig=$EKS_CLUSTER_KUBECONFIG get deploy ${SVC_DEPLOYMENT_NAME}  -o=jsonpath='{.spec.template.spec.containers[0].image}' -n ${SVC_NAMESPACE}
+    - kubectl --insecure-skip-tls-verify --kubeconfig=$EKS_CLUSTER_KUBECONFIG rollout status deploy/${SVC_DEPLOYMENT_NAME} -n ${SVC_NAMESPACE}
+  only:
+    - main
+
